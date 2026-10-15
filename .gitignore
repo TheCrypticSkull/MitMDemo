@@ -1,0 +1,7 @@
+# Keep private keys out of Git
+certs/*.key
+certs/*key.pem
+
+# Python-generated files
+__pycache__/
+*.pyc
