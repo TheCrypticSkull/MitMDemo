@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Northwind Demo Bank -- an HTTP vs HTTPS teaching tool.
+Fake Bank LLC -- an HTTP vs HTTPS teaching tool.
 
 Serves a FAKE bank login page for a network-security classroom demo.
 When the form is submitted, the username and password travel in the body of
@@ -30,18 +30,22 @@ KEY_FILE = os.environ.get("KEY_FILE")
 
 PAGE_STYLE = """
   :root {
-    --ink: #0f2233;
-    --field: #ffffff;
-    --field-border: #c4cdd6;
-    --surface: #ffffff;
-    --page: #e9eef2;
-    --brand: #0b5e4f;
+    --ink: #ece7f5;
+    --field: #1b1026;
+    --field-border: #3d2a52;
+    --surface: #241433;
+    --surface-border: #37214d;
+    --page: #120718;
+    --brand: #7c3aed;
+    --brand-2: #a855f7;
     --brand-ink: #ffffff;
-    --warn-bg: #fff4d6;
-    --warn-border: #e0a800;
-    --warn-ink: #5c4600;
-    --muted: #5a6b78;
-    color-scheme: light;
+    --warn-bg: #ffcf33;
+    --warn-border: #b8860b;
+    --warn-ink: #3a2a00;
+    --muted: #a494bf;
+    --code-bg: #0c0417;
+    --code-ink: #e9d5ff;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
   body {
@@ -49,7 +53,9 @@ PAGE_STYLE = """
     min-height: 100vh;
     font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
     color: var(--ink);
-    background: var(--page);
+    background:
+      radial-gradient(1100px 600px at 50% -10%, rgba(124, 58, 237, 0.22), transparent 70%),
+      var(--page);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -67,21 +73,29 @@ PAGE_STYLE = """
     line-height: 1.5;
   }
   .warning strong { font-size: 1.05rem; }
+  .chip {
+    display: inline;
+    padding: 2px 6px;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 4px;
+  }
   .card {
     width: 100%;
     max-width: 420px;
     background: var(--surface);
+    border: 1px solid var(--surface-border);
     border-radius: 14px;
-    box-shadow: 0 10px 30px rgba(15, 34, 51, 0.12);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
     overflow: hidden;
   }
   .brand {
-    background: var(--brand);
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
     color: var(--brand-ink);
     padding: 22px 28px;
   }
   .brand .logo { font-size: 1.4rem; font-weight: 700; letter-spacing: 0.3px; }
-  .brand .tag { opacity: 0.85; font-size: 0.85rem; margin-top: 2px; }
+  .brand .tag { opacity: 0.9; font-size: 0.85rem; margin-top: 2px; }
   form, .result { padding: 26px 28px 30px; }
   label { display: block; font-size: 0.85rem; color: var(--muted); margin: 14px 0 6px; }
   input[type=text], input[type=password] {
@@ -93,7 +107,7 @@ PAGE_STYLE = """
     background: var(--field);
     color: var(--ink);
   }
-  input:focus-visible { outline: 3px solid rgba(11, 94, 79, 0.35); outline-offset: 1px; }
+  input:focus-visible { outline: 3px solid rgba(168, 85, 247, 0.5); outline-offset: 1px; }
   button {
     width: 100%;
     margin-top: 22px;
@@ -101,25 +115,25 @@ PAGE_STYLE = """
     font-size: 1rem;
     font-weight: 600;
     color: var(--brand-ink);
-    background: var(--brand);
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
     border: none;
     border-radius: 8px;
     cursor: pointer;
   }
-  button:hover { filter: brightness(1.06); }
+  button:hover { filter: brightness(1.1); }
   .foot { text-align: center; color: var(--muted); font-size: 0.78rem; margin-top: 22px; }
   .result h2 { margin: 0 0 10px; }
   .result code {
     display: block;
-    background: #0f2233;
-    color: #d7f5ec;
+    background: var(--code-bg);
+    color: var(--code-ink);
     padding: 12px 14px;
     border-radius: 8px;
     font-size: 0.95rem;
     word-break: break-all;
     margin: 6px 0 16px;
   }
-  .result a { color: var(--brand); font-weight: 600; }
+  .result a { color: var(--brand-2); font-weight: 600; }
   @media (prefers-reduced-motion: no-preference) { button { transition: filter 0.15s; } }
 """
 
@@ -128,7 +142,7 @@ WARNING_BANNER = """
     <strong>&#9888; Demonstration only.</strong><br>
     This is a fake bank page built to show how network traffic can be captured.
     <strong>Do not type a real username or password.</strong>
-    Use made-up values such as <code style="display:inline;padding:2px 6px;background:#0f2233;color:#d7f5ec;border-radius:4px;">testuser / notmyrealpassword</code>.
+    Use made-up values such as <span class="chip">testuser / notmyrealpassword</span>.
   </div>
 """
 
@@ -158,7 +172,7 @@ def login_body(scheme):
     return f"""
   <div class="card">
     <div class="brand">
-      <div class="logo">Northwind Demo Bank</div>
+      <div class="logo">Fake Bank LLC</div>
       <div class="tag">Online banking &middot; secure sign in (pretend)</div>
     </div>
     <form method="POST" action="/login">
@@ -185,7 +199,7 @@ def result_body(scheme, username, password):
     return f"""
   <div class="card">
     <div class="brand">
-      <div class="logo">Northwind Demo Bank</div>
+      <div class="logo">Fake Bank LLC</div>
       <div class="tag">Sign-in received</div>
     </div>
     <div class="result">
@@ -200,7 +214,7 @@ def result_body(scheme, username, password):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "NorthwindDemo/1.0"
+    server_version = "FakeBankLLC/1.0"
 
     @property
     def scheme(self):
@@ -218,7 +232,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.split("?", 1)[0] in ("/", "/login"):
-            self._send(page("Northwind Demo Bank - Sign in", login_body(self.scheme)))
+            self._send(page("Fake Bank LLC - Sign in", login_body(self.scheme)))
         else:
             self._send(page("Not found", '<div class="card"><div class="result">'
                             '<h2>404</h2><p>Nothing here. Try '
@@ -242,7 +256,7 @@ class Handler(BaseHTTPRequestHandler):
               f"{self.client_address[0]} -> username={username!r} password={password!r}",
               flush=True)
 
-        self._send(page("Northwind Demo Bank - Received",
+        self._send(page("Fake Bank LLC - Received",
                         result_body(self.scheme, username, password)))
 
     def log_message(self, fmt, *args):
@@ -258,7 +272,7 @@ def main():
         ctx.load_cert_chain(certfile=CERT_FILE, keyfile=KEY_FILE)
         httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
         scheme = "https"
-    print(f"Northwind Demo Bank serving on {scheme}://{HOST}:{PORT}", flush=True)
+    print(f"Fake Bank LLC serving on {scheme}://{HOST}:{PORT}", flush=True)
     print("Reminder: this is a demo. Do not enter real credentials.", flush=True)
     try:
         httpd.serve_forever()
