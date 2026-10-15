@@ -1,90 +1,124 @@
-# Northwind Demo Bank — HTTP vs HTTPS packet-capture demo
+# Fake Bank LLC — HTTP vs HTTPS Demonstration
 
-A deliberately fake bank login page for teaching why HTTPS matters. Submit the
-form while Wireshark is capturing, then compare:
+Fake Bank LLC is a **fictional banking login page** built for a network-security demonstration. Its purpose is to show how HTTP and HTTPS handle submitted information differently when traffic is inspected with Wireshark.
 
-- **HTTP** — the username and password appear in plaintext in the capture.
-- **HTTPS** — the same submission is encrypted and unreadable.
+- **HTTP:** A network capture can reveal the submitted username and password in plaintext.
+- **HTTPS:** TLS encrypts the traffic in transit, so a normal passive packet capture cannot read the submitted credentials.
 
-The page carries a loud banner telling anyone not to enter real credentials.
-No third-party Python packages are used, so it builds and runs offline.
+The page displays a prominent warning to **never enter real credentials**. Only use invented usernames and passwords on a lab network that you own or are authorized to test.
 
-> This is a lab tool for a network you own and control. The page uses the
-> fictional name "Northwind Demo Bank" and does not imitate any real institution.
+## Requirements
 
-## Run it
+- Python 3.8 or later (standard library only)
+- OpenSSL, if you need to create a demonstration certificate
+- Wireshark, for packet inspection
+- Two terminals if you want to serve HTTP and HTTPS simultaneously
 
-### Option A — docker compose (serves HTTP and HTTPS at once)
+No database, Docker setup, or external Python packages are required.
+
+## Project structure
+
+```text
+MitMDemo/
+├── server.py
+├── README.md
+├── .gitignore
+└── certs/
+    ├── cert.pem       # Public TLS certificate
+    └── key.pem        # Private TLS key: do not commit
+```
+
+Run the commands below from the project root so the relative `certs/` paths resolve correctly.
+
+## TLS certificate setup
+
+If you do not already have a certificate for this demonstration, create a temporary self-signed certificate:
 
 ```bash
-# 1. Create a self-signed cert for the HTTPS service
 mkdir -p certs
 openssl req -x509 -newkey rsa:2048 -nodes \
   -keyout certs/key.pem -out certs/cert.pem \
-  -days 365 -subj "/CN=demo-bank.local"
-
-# 2. Build and start both services
-docker compose up --build
+  -days 30 -subj "/CN=localhost" \
+  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+chmod 600 certs/key.pem
 ```
 
-- HTTP:  `http://<docker-host-ip>:8080`
-- HTTPS: `https://<docker-host-ip>:8443` (browser will warn about the self-signed
-  cert — that's expected; click through for the demo)
+This example covers local connections to `localhost` or `127.0.0.1`. If accessing the demo from another device, generate a certificate containing the hostname or IP address used by that device. Browsers will generally warn that a self-signed certificate is not trusted unless you explicitly configure trust for the demonstration.
 
-### Option B — plain docker, one container
+## Starting the server
+
+The server uses `PORT`, `BIND_HOST`, `CERT_FILE`, and `KEY_FILE` environment variables to select its network interface, port, and protocol.
+
+### Option A: Ports 80 and 443
+
+These are the standard HTTP and HTTPS ports. Run each command in a **separate terminal**:
+
+**Terminal 1 — HTTP**
 
 ```bash
-docker build -t northwind-demo-bank .
-
-# HTTP
-docker run --rm -p 8080:8080 northwind-demo-bank
-
-# HTTPS (mount a cert directory as /certs first)
-docker run --rm -p 8443:8443 \
-  -e PORT=8443 -e CERT_FILE=/certs/cert.pem -e KEY_FILE=/certs/key.pem \
-  -v "$PWD/certs:/certs:ro" northwind-demo-bank
+sudo PORT=80 python3 server.py
 ```
 
-### Option C — no Docker
+**Terminal 2 — HTTPS**
 
 ```bash
-python3 server.py                       # HTTP on :8080
-PORT=8443 CERT_FILE=certs/cert.pem KEY_FILE=certs/key.pem python3 server.py   # HTTPS
+sudo PORT=443 CERT_FILE=certs/cert.pem KEY_FILE=certs/key.pem python3 server.py
 ```
 
-## Configuration (environment variables)
+Open:
 
-| Variable    | Default   | Purpose                                            |
-|-------------|-----------|----------------------------------------------------|
-| `PORT`      | `8080`    | Port to listen on                                  |
-| `BIND_HOST` | `0.0.0.0` | Interface to bind                                  |
-| `CERT_FILE` | *(unset)* | Path to TLS cert — set with `KEY_FILE` for HTTPS   |
-| `KEY_FILE`  | *(unset)* | Path to TLS private key                            |
+- HTTP: `http://localhost`
+- HTTPS: `https://localhost`
 
-If both `CERT_FILE` and `KEY_FILE` are set, the server starts in HTTPS mode;
-otherwise it serves plain HTTP.
+On Linux, binding directly to ports below 1024 usually requires elevated privileges or another port-binding mechanism. For a simpler demo without running Python as root, use Option B.
 
-## The Wireshark walkthrough
+## Configuration
 
-1. Start the capture in Wireshark on the interface your victim laptop's traffic
-   crosses. A useful display filter: `http` (for the plaintext run) or
-   `tcp.port == 8080 || tcp.port == 8443`.
-2. On the victim laptop, open the **HTTP** page and sign in with fake values,
-   e.g. `testuser` / `notmyrealpassword`.
-3. In Wireshark, find the `POST /login` packet, right-click it, and choose
-   **Follow → HTTP Stream**. You'll see `username=testuser&password=notmyrealpassword`
-   sitting in the clear.
-4. Now repeat on the **HTTPS** page. Filter on `tls` or the HTTPS port. Follow the
-   TLS stream and you'll see only encrypted application data — the credentials
-   are gone from view.
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `8080` | TCP port on which the server listens |
+| `BIND_HOST` | `0.0.0.0` | IPv4 address/interface on which the server listens; `0.0.0.0` means all IPv4 interfaces |
+| `CERT_FILE` | Unset | Path to the TLS certificate |
+| `KEY_FILE` | Unset | Path to the TLS private key |
 
-The container also prints every submission to its stdout
-(`docker compose logs -f bank-http`), which is handy for confirming the request
-landed while you hunt for the packet.
+Set **both** `CERT_FILE` and `KEY_FILE` to enable HTTPS. Otherwise, the script serves HTTP.
 
-## Notes
+## Wireshark demonstration
 
-- Nothing is stored. Submitted values are echoed back to the browser and logged
-  to stdout only, to make the capture tangible.
-- For a clean capture, prefer the plaintext HTTP run on an isolated lab network.
-- Keep the warning banner intact if you adapt the page.
+Capture only traffic from systems and networks you have permission to inspect. A two-computer lab makes the difference especially clear because the traffic crosses a real network interface.
+
+1. Start Wireshark on the interface carrying traffic between the demonstration client and server. If testing only on one computer, use its loopback capture interface.
+2. Open the **HTTP** site and submit made-up credentials, such as `testuser` and `notmyrealpassword`.
+3. Filter for the HTTP traffic using `tcp.port == 80` Locate the `POST /login` request and select **Follow → HTTP Stream**. The form data will be readable in the request body, for example:
+
+   ```text
+   username=testuser&password=notmyrealpassword
+   ```
+
+4. Repeat with the **HTTPS** site. Filter with `tcp.port == 443` (or `tcp.port == 8443`). TLS protects the HTTP request body in transit; without the TLS session keys, the same form data will not be readable in an ordinary packet capture.
+5. Compare the two captures: **HTTP sends form data without transport encryption; HTTPS protects it with TLS.**
+
+The server prints each submitted username and password in the terminal and also echoes them on its confirmation page. That is **intentional for this demonstration**: the server can see data after receiving and decrypting it, while an ordinary passive observer of HTTPS traffic cannot.
+
+## Security and limitations
+
+- **Use fake credentials only.** The site is not a real banking or authentication system.
+- **No database is used.** Submissions are not intentionally written to a database or file, but they are displayed in the response and printed to server stdout, where redirected output or external logging tools could retain them.
+- **Do not deploy this as a public login service.** It has no real authentication, rate limiting, or production security controls.
+- **Protect the TLS private key.** Keep `certs/key.pem` out of version control and do not reuse demonstration keys for real services.
+- **Use an isolated lab network when possible.** The script's default bind address is `0.0.0.0`, so specify `BIND_HOST` if you want to limit access.
+- **Self-signed certificates are for demonstration here.** Encryption and server identity verification are distinct concepts; a self-signed certificate does not automatically establish that the server is trustworthy.
+
+## Learning objectives
+
+By completing the demonstration, you should be able to:
+
+1. Identify an HTTP form submission in Wireshark.
+2. Explain why HTTP request bodies can be read in a plaintext capture.
+3. Observe that HTTPS encrypts HTTP application data during transmission.
+4. Explain the difference between data visible to the receiving server and data visible to a passive network observer.
+5. Describe the role of TLS certificates and why private keys must be protected.
+
+---
+
+**Disclaimer:** Fake Bank LLC is a fictional educational project. It is not affiliated with a real financial institution and must never be used to collect actual usernames, passwords, or banking information.
